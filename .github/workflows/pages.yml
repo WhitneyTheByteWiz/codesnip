@@ -9,20 +9,45 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      pages: write
-      id-token: write
+      contents: write
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: "./public"
-      - name: Deploy to GitHub Pages
-        id: deploy
-        uses: actions/deploy-pages@v4
+
+      - name: Install build deps
+        run: npm ci
+
+      - name: Build web assets
+        run: npx tsc
+
+      - name: Deploy to GitHub Pages (gh-pages branch)
+        env:
+          ACTION_DEPLOYMENT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Use peaceiris/actions-gh-pages-style direct push to gh-pages
+          # Configure git
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Clone the gh-pages branch (or create it)
+          git clone --depth 1 --no-checkout https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git gh-pages-tmp
+          cd gh-pages-tmp
+          git config commit.gpgsign false
+          git checkout --orphan gh-pages 2>/dev/null || git checkout -b gh-pages
+          git rm -rf --cached . 2>/dev/null || true
+
+          # Copy built output
+          rm -rf *
+          cp -r ../public/* .
+          echo "whitneythebytewiz.github.io" > CNAME
+
+          git add -A
+          git commit -m "Deploy web UI from ${{ github.sha }}" || echo "No changes to deploy"
+          git push -u origin gh-pages --force
+
+          cd ..
+          rm -rf gh-pages-tmp
