@@ -1,5 +1,9 @@
 # >_ CodeSnip
 
+![Build](https://github.com/WhitneyTheByteWiz/codesnip/actions/workflows/ci.yml/badge.svg)
+![npm](https://img.shields.io/npm/v/codesnip-search)
+![License](https://img.shields.io/github/license/WhitneyTheByteWiz/codesnip)
+
 **Find battle-tested code before you write it.**
 
 CodeSnip is a local-first search engine for reusable code. It indexes real, starred GitHub projects and lets you search for solutions to the problem you're solving right now — *"rate limiter"*, *"jwt auth"*, *"retry with backoff"* — then jump straight to the source to adapt it.
@@ -76,7 +80,7 @@ Fresh, popular code wins. Abandoned repos fade.
 PRs welcome! Keep dependencies minimal, keep the CLI fast, keep the tests green.
 
 ```bash
-git clone https://github.com/whitneySyulikwa/codesnip
+git clone https://github.com/WhitneyTheByteWiz/codesnip.git
 cd codesnip && npm install && npm test
 ```
 
