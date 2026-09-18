@@ -1,0 +1,40 @@
+{
+  "name": "codesnip-search",
+  "version": "0.1.0",
+  "description": "Search and reuse battle-tested code snippets from GitHub, Stack Overflow, and gists. Find similar works for your project and adapt them.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "codesnip": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "test": "node --test"
+  },
+  "keywords": [
+    "code-search",
+    "snippets",
+    "developer-tools",
+    "cli",
+    "reuse",
+    "github",
+    "stack-overflow",
+    "full-text-search"
+  ],
+  "author": "Whitney Jr Syulikwa <whitneySyulikwa@users.noreply.github.com>",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "minisearch": "^7.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
