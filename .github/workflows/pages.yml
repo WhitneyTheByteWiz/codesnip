@@ -3,8 +3,7 @@ name: Deploy web UI to GitHub Pages
 on:
   push:
     branches: [main]
-    paths:
-      - "public/**"
+  workflow_dispatch:
 
 jobs:
   deploy:
