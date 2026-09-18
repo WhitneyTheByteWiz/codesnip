@@ -1,39 +1,50 @@
 import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFile, stat } from "node:fs/promises";
+import { resolve, extname } from "node:path";
 import type { SnippetStore } from "../storage/store.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const PUBLIC_DIR = resolve(process.cwd(), "public");
+const MIME: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+};
 
-export async function startServer(store: SnippetStore, port: number): Promise<void> {
+export async function startServer(_store: SnippetStore | null, port: number): Promise<void> {
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://localhost:${port}`);
+    const safePath = url.pathname.replace(/^\//, "");
 
-    if (url.pathname === "/api/search") {
-      const q = url.searchParams.get("q") ?? "";
-      const lang = url.searchParams.get("lang");
-      const limit = Math.min(50, parseInt(url.searchParams.get("limit") ?? "20", 10));
-      const result = store.search({
-        query: q,
-        languages: lang ? [lang] : undefined,
-        limit,
-      });
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(result));
-      return;
+    let filePath = "index.html";
+    if (safePath) {
+      const stat = await tryStat(resolve(PUBLIC_DIR, safePath));
+      if (stat?.isFile()) filePath = safePath;
     }
 
-    if (url.pathname === "/" || url.pathname === "/index.html") {
-      const html = await readFile(resolve(__dirname, "../../public/index.html"), "utf8");
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(html.replace("__COUNT__", String(store.size)));
-      return;
+    try {
+      const content = await readFile(resolve(PUBLIC_DIR, filePath));
+      const ext = extname(filePath);
+      res.writeHead(200, { "Content-Type": MIME[ext] ?? "application/octet-stream" });
+      res.end(content);
+    } catch {
+      res.writeHead(404, { "Content-Type": "text/plain" });
+      res.end("Not found");
     }
-
-    res.writeHead(404).end("Not found");
   });
 
   await new Promise<void>((ok) => server.listen(port, ok));
   console.log(`CodeSnip UI → http://localhost:${port}`);
+}
+
+async function tryStat(path: string) {
+  try {
+    return await stat(path);
+  } catch {
+    return null;
+  }
 }

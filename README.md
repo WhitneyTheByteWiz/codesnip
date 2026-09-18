@@ -40,18 +40,25 @@ git clone https://github.com/WhitneyTheByteWiz/codesnip.git && cd codesnip && np
 
 ## Quickstart
 
+**Try it live:** [https://whitneythebytewiz.github.io/codesnip](https://whitneythebytebywiz.github.io/codesnip)
+
+Or run locally:
+
 ```bash
-# 1. Build an index — top-starred Go repos about rate limiting
+# Install (recommended for CLI use)
+npm install -g codesnip-search
+# or run without installing:
+npx codesnip-search
+
+# Web UI (serves the self-contained browser app)
+codesnip serve   # → http://localhost:4173
+
+# Index snippets from GitHub
 codesnip index -k "rate limiting" -l go -s 500 -n 100
 
-# 2. Search it
+# Search
 codesnip search "token bucket"
-
-# 3. Inspect the best hit
 codesnip show gh-uber-go-ratelimit
-
-# 4. Or browse in the browser
-codesnip serve   # → http://localhost:4173
 ```
 
 ## How scoring works

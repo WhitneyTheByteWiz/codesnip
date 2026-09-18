@@ -4,56 +4,186 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CodeSnip — find reusable code</title>
+<script src="https://cdn.jsdelivr.net/npm/minisearch@7.1.0/dist/umd/minisearch.min.js"></script>
 <style>
-  :root { --bg:#0d1117; --card:#161b22; --border:#30363d; --text:#e6edf3; --muted:#8b949e; --accent:#2f81f7; --green:#3fb950; }
+  :root { --bg:#0d1117; --card:#161b22; --border:#30363d; --text:#e6edf3; --muted:#8b949e; --accent:#2f81f7; --green:#3fb950; --amber:#f2cc60; }
   * { box-sizing:border-box; margin:0; }
-  body { background:var(--bg); color:var(--text); font:16px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; min-height:100vh; padding:3rem 1rem; }
-  main { max-width:820px; margin:0 auto; }
-  h1 { font-size:1.8rem; letter-spacing:-.5px; }
+  body { background:var(--bg); color:var(--text); font:16px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; min-height:100vh; padding:2.5rem 1rem; }
+  main { max-width:840px; margin:0 auto; }
+  h1 { font-size:1.9rem; letter-spacing:-.5px; }
   h1 span { color:var(--accent); }
   .sub { color:var(--muted); margin:.4rem 0 2rem; }
-  form { display:flex; gap:.5rem; margin-bottom:1.5rem; }
-  input { flex:1; background:var(--card); border:1px solid var(--border); border-radius:8px; padding:.8rem 1rem; color:var(--text); font:inherit; }
-  input:focus { outline:2px solid var(--accent); }
-  button { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.8rem 1.6rem; font:inherit; font-weight:700; cursor:pointer; }
+  .actions { display:flex; gap:.6rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+  input, select, button { font:inherit; border:1px solid var(--border); border-radius:8px; }
+  input, select { background:var(--card); color:var(--text); padding:.7rem 1rem; outline:none; }
+  input:focus { border-color:var(--accent); }
+  button { background:var(--accent); color:#fff; border:0; padding:.7rem 1.5rem; font-weight:700; cursor:pointer; white-space:nowrap; }
   button:hover { filter:brightness(1.15); }
+  button.secondary { background:var(--card); }
+  .token-row { display:flex; gap:.5rem; margin-bottom:1rem; }
+  .token-row input { flex:1; }
+  .token-row input[type=password] { padding:.7rem 1rem; }
   .result { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1.1rem 1.3rem; margin-bottom:1rem; }
-  .result h3 { font-size:1rem; display:flex; justify-content:space-between; gap:1rem; }
-  .stars { color:#e3b341; white-space:nowrap; }
+  .result h3 { font-size:1rem; display:flex; justify-content:space-between; gap:1rem; align-items:center; }
+  .stars { color:var(--amber); white-space:nowrap; font-size:1.05rem; }
   .desc { color:var(--muted); font-size:.85rem; margin:.3rem 0 .6rem; }
   a { color:var(--accent); text-decoration:none; font-size:.85rem; }
   a:hover { text-decoration:underline; }
   .meta { color:var(--muted); font-size:.75rem; }
-  .empty { color:var(--muted); text-align:center; padding:3rem 0; }
+  .stats { display:flex; gap:1.5rem; color:var(--muted); font-size:.85rem; margin-bottom:1.5rem; }
+  .stats span { color:var(--text); font-weight:700; }
+  .pill { display:inline-block; background:#21262d; color:var(--text); font-size:.72rem; padding:.2rem .6rem; border-radius:12px; margin-right:.2rem; }
+  .empty { color:var(--muted); text-align:center; padding:3rem 0; flex-direction:column; gap:.5rem; }
+  .progress { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1.2rem; margin-bottom:1rem; font-size:.85rem; }
+  .progress .bar { background:var(--accent); border-radius:4px; height:4px; margin-top:.6rem; transition:width .3s; }
 </style>
 </head>
 <body>
 <main>
   <h1>&gt;_ Code<span>Snip</span></h1>
-  <p class="sub">Search battle-tested code from real projects. __COUNT__ snippets indexed. Find similar work, adapt it, ship faster.</p>
-  <form id="f">
-    <input id="q" placeholder='e.g. "rate limiter", "jwt auth", "retry with backoff"…' autofocus>
-    <button>Search</button>
+  <p class="sub">Search battle-tested code from real GitHub projects. Works entirely in your browser — no server, no login required (uses your own GitHub token for higher limits).</p>
+
+  <div class="stats">
+    <span>Indexed snippets: <strong id="count">0</strong></span>
+    <span>GitHub searches: <strong id="searches">0</strong></span>
+  </div>
+
+  <div class="token-row">
+    <input id="token" type="password" placeholder="GitHub token (optional, for higher rate limits)…" size="40">
+    <button id="saveToken" class="secondary">Save token</button>
+    <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">get token →</a>
+  </div>
+
+  <form id="indexForm" class="actions">
+    <input id="ikey" placeholder='keywords: "rate limiting", "jwt auth", "retry"…' required>
+    <input id="ilang" placeholder="language (optional)">
+    <input id="istars" type="number" placeholder="min stars" value="100">
+    <input id="imax" type="number" placeholder="max results" value="100">
+    <button type="submit">Index</button>
   </form>
-  <div id="out"><p class="empty">Type a query — results come from your local index.<br>Build one first: <code>codesnip index -k "cli tools"</code></p></div>
+
+  <div id="progress" class="progress" style="display:none;"></div>
+
+  <form id="searchForm" class="actions">
+    <input id="sq" placeholder='search: "token bucket", "middleware", "backoff"…' required>
+    <button type="submit">Search</button>
+    <button type="button" id="clear" class="secondary">Clear index</button>
+  </form>
+
+  <div id="out"></div>
 </main>
+
 <script>
-const out = document.getElementById('out');
-const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-document.getElementById('f').onsubmit = async e => {
-  e.preventDefault();
-  const q = document.getElementById('q').value;
-  const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-  const { snippets, queryTimeMs } = await r.json();
-  if (!snippets.length) { out.innerHTML = `<p class="empty">No results for "${esc(q)}" (${queryTimeMs}ms)</p>`; return; }
-  out.innerHTML = snippets.map(s => `
-    <div class="result">
-      <h3>${esc(s.title)} <span class="stars">★ ${s.quality.stars.toLocaleString()}</span></h3>
-      <p class="desc">${esc(s.description)}</p>
-      <a href="${esc(s.source.url)}" target="_blank" rel="noopener">${esc(s.source.repository ?? s.source.url)}</a>
-      <span class="meta"> · ${esc(s.language)} · score ${s.quality.score}</span>
-    </div>`).join('');
+const mini = window.MiniSearch;
+let store = null;
+let token = localStorage.getItem('token') || '';
+let searchCount = 0;
+
+document.getElementById('saveToken').onclick = () => {
+  token = document.getElementById('token').value;
+  if (token) { localStorage.setItem('token', token); }
+  document.getElementById('saveToken').textContent = 'Saved ✓';
+  setTimeout(() => document.getElementById('saveToken').textContent = 'Save token', 2000);
 };
+if (token) { document.getElementById('token').value = '••••••••'; }
+
+function initStore(snippets) {
+  store = mini.loadJSON(JSON.stringify(snippets), {
+    fields: ['title','description','code','language','tags'],
+    searchOptions: { boost: { title:3, description:2, tags:2 }, prefix:true, fuzzy:0.2 },
+    extractField: (doc, field) => field === 'tags' ? (doc.tags||[]).join(' ') : String(doc[field]||'')
+  });
+  document.getElementById('count').textContent = store.documents().length;
+}
+
+// Try to load saved index
+const saved = localStorage.getItem('snippetIndex');
+if (saved) { try { initStore(JSON.parse(saved)); } catch(e) {} }
+
+async function indexRepos() {
+  const key = document.getElementById('ikey').value;
+  const lang = document.getElementById('ilang').value;
+  const stars = document.getElementById('istars').value;
+  const max = parseInt(document.getElementById('imax').value) || 100;
+  const parts = [key, `stars:>=${stars || 100}`];
+  if (lang) parts.push(`language:${lang}`);
+  parts.push('pushed:>2023-01-01');
+  const query = parts.join(' ');
+  const perPage = 100;
+  const pages = Math.ceil(max / perPage);
+  let all = store ? store.documents() : [];
+  const startLen = all.length;
+  let fetched = 0;
+
+  document.getElementById('progress').style.display = 'block';
+  document.getElementById('progress').innerHTML = `<div>Indexing GitHub for: <code>${query}</code></div><div class="bar" style="width:0%"></div>`;
+
+  for (let p = 1; p <= pages; p++) {
+    const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${perPage}&page=${p}`;
+    const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}`, 'User-Agent':'codesnip-web' } : { 'User-Agent':'codesnip-web' } });
+    if (!res.ok) { document.getElementById('progress').innerHTML += `<div style="color:#f85149">GitHub error ${res.status} (need a token for higher limits)</div>`; return; }
+    const data = await res.json();
+    for (const repo of (data.items||[]).slice(0, max - fetched)) {
+      const s = {
+        id: `gh-${repo.full_name.replace('/','-')}`,
+        title: repo.name,
+        description: repo.description || '',
+        code: `# ${repo.full_name} — ⭐ ${repo.stargazers_count}\n# ${repo.description||''}\ngit clone https://github.com/${repo.full_name}`,
+        language: (repo.language||'').toLowerCase(),
+        tags: [(repo.language||'').toLowerCase(), ...(repo.topics||[]).slice(0,5)],
+        source_type: repo.owner.login,
+        url: repo.html_url,
+        repository: repo.full_name,
+        stars: repo.stargazers_count,
+        forks: repo.forks_count,
+        recency: Math.floor((Date.now() - new Date(repo.pushed_at).getTime()) / 86400000),
+        score: repo.stargazers_count*0.3 + repo.forks_count*0.2,
+        updated: repo.pushed_at
+      };
+      all.push(s);
+    }
+    fetched += (data.items||[]).length;
+    const pct = Math.min(100, Math.round((fetched / max) * 100));
+    document.querySelector('.progress .bar').style.width = pct + '%';
+    if ((data.items||[]).length < perPage) break;
+  }
+  // Dedupe by url
+  const seen = new Set(); all = all.filter(s => { if (seen.has(s.url)) return false; seen.add(s.url); return true; });
+  localStorage.setItem('snippetIndex', JSON.stringify(all));
+  initStore(all);
+  document.getElementById('progress').innerHTML = `<div>✅ Indexed ${all.length - startLen} new snippets (${all.length} total). Saved in your browser.</div>`;
+  setTimeout(() => { document.getElementById('progress').style.display='none'; }, 3000);
+  return all;
+}
+
+document.getElementById('indexForm').onsubmit = async (e) => { e.preventDefault(); await indexRepos(); };
+
+document.getElementById('searchForm').onsubmit = (e) => { e.preventDefault(); doSearch(); };
+document.getElementById('sq').addEventListener('keydown', (e) => { if (e.key==='Enter') { doSearch(); }});
+document.getElementById('clear').onclick = () => { store=null; localStorage.removeItem('snippetIndex'); document.getElementById('count').textContent='0'; document.getElementById('out').innerHTML='<p class="empty">Index cleared.</p>'; };
+
+function doSearch() {
+  if (!store) { document.getElementById('out').innerHTML='<p class="empty">Index some snippets first.</p>'; return; }
+  const q = document.getElementById('sq').value.trim();
+  searchCount++;
+  document.getElementById('searches').textContent = searchCount;
+  let hits = q ? store.search(q) : store.documents().map(d => ({id:d.id, score:d.score||0}));
+  const out = document.getElementById('out');
+  if (!hits.length) { out.innerHTML='<p class="empty">No results. Try indexing with different keywords.</p>'; return; }
+  out.innerHTML = hits.map(h => {
+    const d = typeof h.doc !== 'undefined' ? h.doc : store.getDoc(h.id);
+    if (!d) return '';
+    const stars = '★'.repeat(Math.min(4, Math.max(1, Math.floor((d.stars||0)/5000))));
+    const ts = new Date(d.updated).toLocaleDateString();
+    return `<div class="result">
+      <h3>${d.title||d.repository} <span class="stars">${stars} ${d.stars||0}</span></h3>
+      ${(d.tags||[]).slice(0,5).map(t=>`<span class="pill">${t}</span>`)}</span><br>
+      <p class="desc">${d.description}</p>
+      <a href="${d.url||d.repository_url}" target="_blank" rel="noopener">${d.repository||d.url}</a>
+      <span class="meta"> · ${d.language} · updated ${ts}</span>
+    </div>`;
+  }).join('');
+}
 </script>
 </body>
 </html>

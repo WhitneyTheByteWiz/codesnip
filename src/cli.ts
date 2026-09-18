@@ -92,11 +92,11 @@ program
 
 program
   .command("serve")
-  .description("Start the web UI")
+  .description("Start the web UI (self-contained, runs in your browser)")
   .option("-p, --port <port>", "port", "4173")
   .action(async (opts) => {
-    const store = await loadStore();
-    await startServer(store, parseInt(opts.port, 10));
+    const { startServer } = await import("./server/web.js");
+    await startServer(null, parseInt(opts.port, 10));
   });
 
 program.parseAsync(process.argv).catch((err) => {
